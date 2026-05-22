@@ -25,6 +25,7 @@ func RegisterCitas(r chi.Router, db *pgxpool.Pool, authMiddleware func(http.Hand
 		r.Get("/", h.list)
 		r.Post("/", h.create)
 		r.Post("/calificacion", h.registrarCalificacion)
+		r.Get("/mis-citas", h.misCitas)
 		r.Get("/{id}", h.detail)
 		r.Put("/{id}", h.update)
 		r.Delete("/{id}", h.cancel)
@@ -512,4 +513,68 @@ func AutocompletarCitas(db *pgxpool.Pool) {
 			go pushToNegocio(db, nid, titulo, msg)
 		}
 	}
+}
+
+// ── GET /api/citas/mis-citas?telefono=XXXXXXXXXX ──────────────────
+
+type misCitaRow struct {
+	ID             int    `json:"id"`
+	FechaHora      string `json:"fecha_hora"`
+	Status         string `json:"status"`
+	ServicioNombre string `json:"servicio_nombre"`
+	ServicioID     *int   `json:"servicio_id"`
+	ClienteID      *int   `json:"cliente_id"`
+	ClienteNombre  string `json:"cliente_nombre"`
+}
+
+func (h *citasHandler) misCitas(w http.ResponseWriter, r *http.Request) {
+	uid := mw.UIDFromContext(r.Context())
+	nid, ok := negocioIDForUID(r.Context(), h.db, uid, w)
+	if !ok {
+		return
+	}
+
+	telefono := strings.TrimSpace(r.URL.Query().Get("telefono"))
+	if telefono == "" {
+		http.Error(w, `{"error":"telefono es requerido"}`, http.StatusBadRequest)
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(),
+		`SELECT c.id, c.fecha_hora, c.status,
+		        COALESCE(s.nombre, '') AS servicio_nombre,
+		        c.servicio_id,
+		        c.cliente_id,
+		        COALESCE(cl.nombre || ' ' || COALESCE(cl.apellido,''), cl.nombre) AS cliente_nombre
+		 FROM citas c
+		 JOIN clientes cl ON cl.id = c.cliente_id AND cl.negocio_id = $1
+		 LEFT JOIN servicios s ON s.id = c.servicio_id
+		 WHERE c.negocio_id = $1
+		   AND cl.telefono = $2
+		   AND c.fecha_hora >= NOW()
+		   AND c.status IN ('agendada', 'confirmada', 'reagendada')
+		 ORDER BY c.fecha_hora ASC
+		 LIMIT 5`,
+		nid, telefono)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	result := []misCitaRow{}
+	for rows.Next() {
+		var row misCitaRow
+		var fh time.Time
+		if err := rows.Scan(&row.ID, &fh, &row.Status,
+			&row.ServicioNombre, &row.ServicioID,
+			&row.ClienteID, &row.ClienteNombre); err != nil {
+			continue
+		}
+		row.FechaHora = fh.Format(time.RFC3339)
+		result = append(result, row)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
