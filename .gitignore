@@ -1,0 +1,23 @@
+# Environment
+.env
+*.env
+
+# Binaries
+dezai-api
+dezai-api.exe
+*.exe
+*.out
+
+# Build artifacts
+/dist/
+/bin/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
