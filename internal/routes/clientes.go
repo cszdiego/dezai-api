@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -21,6 +22,7 @@ func RegisterClientes(r chi.Router, db *pgxpool.Pool, authMiddleware func(http.H
 		r.Use(authMiddleware)
 		r.Get("/", h.list)
 		r.Post("/", h.create)
+		r.Get("/por-telefono", h.porTelefono)
 		r.Get("/{id}", h.detail)
 		r.Put("/{id}", h.update)
 		r.Delete("/{id}", h.delete)
@@ -259,4 +261,37 @@ func (h *clientesHandler) delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *clientesHandler) porTelefono(w http.ResponseWriter, r *http.Request) {
+	uid := mw.UIDFromContext(r.Context())
+	nid, ok := negocioIDForUID(r.Context(), h.db, uid, w)
+	if !ok {
+		return
+	}
+
+	raw := r.URL.Query().Get("telefono")
+	if raw == "" {
+		http.Error(w, `{"error":"telefono es requerido"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Normalizar: quitar espacios, guiones y símbolo +
+	normalized := strings.NewReplacer(" ", "", "-", "", "+", "").Replace(raw)
+
+	// Buscar con sufijo para tolerar distintos prefijos internacionales
+	c, err := scanCliente(h.db.QueryRow(r.Context(),
+		`SELECT `+clienteColumns+`
+		 FROM clientes
+		 WHERE negocio_id = $1
+		   AND REPLACE(REPLACE(telefono, ' ', ''), '-', '') LIKE '%' || $2
+		 LIMIT 1`,
+		nid, normalized))
+	if err != nil {
+		http.Error(w, `{"error":"cliente not found"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(c)
 }
