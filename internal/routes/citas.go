@@ -171,6 +171,7 @@ type createCitaRequest struct {
 	DuracionMinutos *int     `json:"duracion_minutos"`
 	Precio          *float64 `json:"precio"`
 	Notas           *string  `json:"notas"`
+	Status          *string  `json:"status"`
 }
 
 func (h *citasHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -206,20 +207,18 @@ func (h *citasHandler) create(w http.ResponseWriter, r *http.Request) {
 		precio = req.Precio
 	}
 
-	// Leer configuración de agenda para status inicial y límite por hora
-	var confirmacionAuto bool
+	// Leer límite por hora desde configuración de agenda
 	var maxCitasPorHora int
 	h.db.QueryRow(r.Context(),
-		`SELECT confirmacion_automatica, max_citas_por_hora
-		 FROM configuracion_agenda WHERE negocio_id=$1`, nid).
-		Scan(&confirmacionAuto, &maxCitasPorHora)
+		`SELECT max_citas_por_hora FROM configuracion_agenda WHERE negocio_id=$1`, nid).
+		Scan(&maxCitasPorHora)
 	if maxCitasPorHora == 0 {
 		maxCitasPorHora = 1
 	}
 
 	initialStatus := "agendada"
-	if confirmacionAuto {
-		initialStatus = "confirmada"
+	if req.Status != nil && *req.Status != "" {
+		initialStatus = *req.Status
 	}
 
 	// Verificar límite de citas por hora para el trabajador
