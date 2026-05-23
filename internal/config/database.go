@@ -255,6 +255,9 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			                     '{nombre} completó su cita #{numero} y tiene un descuento pendiente 🎉'
 		)`,
 
+		`ALTER TABLE promociones ADD COLUMN IF NOT EXISTS fecha_inicio DATE`,
+		`ALTER TABLE promociones ADD COLUMN IF NOT EXISTS fecha_fin   DATE`,
+
 		// ── galeria ──────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS galeria (
 			id           SERIAL PRIMARY KEY,

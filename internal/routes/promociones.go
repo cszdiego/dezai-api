@@ -27,20 +27,23 @@ func RegisterPromociones(r chi.Router, db *pgxpool.Pool, authMiddleware func(htt
 }
 
 type promocion struct {
-	ID          int       `json:"id"`
-	NegocioID   int       `json:"negocio_id"`
-	Titulo      string    `json:"titulo"`
-	Descripcion *string   `json:"descripcion,omitempty"`
-	ImagenURL   *string   `json:"imagen_url,omitempty"`
-	Activo      bool      `json:"activo"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          int        `json:"id"`
+	NegocioID   int        `json:"negocio_id"`
+	Titulo      string     `json:"titulo"`
+	Descripcion *string    `json:"descripcion,omitempty"`
+	ImagenURL   *string    `json:"imagen_url,omitempty"`
+	Activo      bool       `json:"activo"`
+	FechaInicio *time.Time `json:"fecha_inicio,omitempty"`
+	FechaFin    *time.Time `json:"fecha_fin,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
-const promocionColumns = `id, negocio_id, titulo, descripcion, imagen_url, activo, created_at`
+const promocionColumns = `id, negocio_id, titulo, descripcion, imagen_url, activo, fecha_inicio, fecha_fin, created_at`
 
 func scanPromocion(row interface{ Scan(...any) error }) (promocion, error) {
 	var p promocion
-	return p, row.Scan(&p.ID, &p.NegocioID, &p.Titulo, &p.Descripcion, &p.ImagenURL, &p.Activo, &p.CreatedAt)
+	return p, row.Scan(&p.ID, &p.NegocioID, &p.Titulo, &p.Descripcion, &p.ImagenURL,
+		&p.Activo, &p.FechaInicio, &p.FechaFin, &p.CreatedAt)
 }
 
 func (h *promocionesCRUDHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +87,8 @@ type promocionRequest struct {
 	Descripcion *string `json:"descripcion"`
 	ImagenURL   *string `json:"imagen_url"`
 	Activo      *bool   `json:"activo"`
+	FechaInicio *string `json:"fecha_inicio"` // "YYYY-MM-DD" or null
+	FechaFin    *string `json:"fecha_fin"`    // "YYYY-MM-DD" or null
 }
 
 func (h *promocionesCRUDHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -105,10 +110,11 @@ func (h *promocionesCRUDHandler) create(w http.ResponseWriter, r *http.Request) 
 	}
 
 	p, err := scanPromocion(h.db.QueryRow(r.Context(),
-		`INSERT INTO promociones (negocio_id, titulo, descripcion, imagen_url, activo)
-		 VALUES ($1,$2,$3,$4,$5) RETURNING `+promocionColumns,
-		nid, req.Titulo, req.Descripcion, req.ImagenURL, activo))
+		`INSERT INTO promociones (negocio_id, titulo, descripcion, imagen_url, activo, fecha_inicio, fecha_fin)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING `+promocionColumns,
+		nid, req.Titulo, req.Descripcion, req.ImagenURL, activo, req.FechaInicio, req.FechaFin))
 	if err != nil {
+		log.Printf("promociones create error: %v", err)
 		http.Error(w, `{"error":"failed to create promocion"}`, http.StatusInternalServerError)
 		return
 	}
@@ -138,9 +144,11 @@ func (h *promocionesCRUDHandler) update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	p, err := scanPromocion(h.db.QueryRow(r.Context(),
-		`UPDATE promociones SET titulo=$3, descripcion=$4, imagen_url=$5, activo=COALESCE($6, activo)
+		`UPDATE promociones
+		 SET titulo=$3, descripcion=$4, imagen_url=$5, activo=COALESCE($6, activo),
+		     fecha_inicio=$7, fecha_fin=$8
 		 WHERE id=$1 AND negocio_id=$2 RETURNING `+promocionColumns,
-		id, nid, req.Titulo, req.Descripcion, req.ImagenURL, req.Activo))
+		id, nid, req.Titulo, req.Descripcion, req.ImagenURL, req.Activo, req.FechaInicio, req.FechaFin))
 	if err != nil {
 		http.Error(w, `{"error":"promocion not found"}`, http.StatusNotFound)
 		return

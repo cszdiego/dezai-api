@@ -88,7 +88,10 @@ func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
 	// Promociones activas
 	promociones := []promocion{}
 	promRows, err := h.db.Query(r.Context(),
-		`SELECT `+promocionColumns+` FROM promociones WHERE negocio_id = $1 AND activo = true ORDER BY created_at DESC`, nid)
+		`SELECT `+promocionColumns+` FROM promociones
+		 WHERE negocio_id = $1 AND activo = true
+		   AND (fecha_fin IS NULL OR fecha_fin >= CURRENT_DATE)
+		 ORDER BY created_at DESC`, nid)
 	if err != nil {
 		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
 		return
