@@ -64,6 +64,7 @@ func main() {
 	routes.RegisterAPIKeys(r, db, authMiddleware)
 	routes.RegisterImagenes(r, db, authMiddleware)
 	routes.RegisterReportes(r, db, authMiddleware)
+	routes.RegisterGaleria(r, db, authMiddleware)
 	routes.RegisterPromociones(r, db, authMiddleware)
 	routes.RegisterFAQs(r, db, authMiddleware)
 	routes.RegisterLinks(r, db, authMiddleware)

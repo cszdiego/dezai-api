@@ -255,6 +255,15 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			                     '{nombre} completó su cita #{numero} y tiene un descuento pendiente 🎉'
 		)`,
 
+		// ── galeria ──────────────────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS galeria (
+			id           SERIAL PRIMARY KEY,
+			negocio_id   INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			imagen_url   TEXT NOT NULL,
+			descripcion  TEXT,
+			created_at   TIMESTAMP DEFAULT NOW()
+		)`,
+
 		// ── promociones ──────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS promociones (
 			id           SERIAL PRIMARY KEY,

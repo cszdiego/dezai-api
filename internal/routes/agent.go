@@ -29,12 +29,19 @@ type negocioPublico struct {
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
+type agentGaleriaItem struct {
+	ID          int     `json:"id"`
+	ImagenURL   string  `json:"imagen_url"`
+	Descripcion *string `json:"descripcion,omitempty"`
+}
+
 type agentInfoResponse struct {
-	Negocio     negocioPublico `json:"negocio"`
-	Servicios   []servicio     `json:"servicios"`
-	Promociones []promocion    `json:"promociones"`
-	FAQs        []faq          `json:"faqs"`
-	Links       []link         `json:"links"`
+	Negocio     negocioPublico   `json:"negocio"`
+	Servicios   []servicio       `json:"servicios"`
+	Promociones []promocion      `json:"promociones"`
+	FAQs        []faq            `json:"faqs"`
+	Links       []link           `json:"links"`
+	Galeria     []agentGaleriaItem `json:"galeria"`
 }
 
 func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +142,25 @@ func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
 	}
 	linkRows.Close()
 
+	// Galería
+	galeria := []agentGaleriaItem{}
+	galRows, err := h.db.Query(r.Context(),
+		`SELECT id, imagen_url, descripcion FROM galeria WHERE negocio_id = $1 ORDER BY created_at DESC`, nid)
+	if err != nil {
+		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
+		return
+	}
+	for galRows.Next() {
+		var g agentGaleriaItem
+		if err := galRows.Scan(&g.ID, &g.ImagenURL, &g.Descripcion); err != nil {
+			galRows.Close()
+			http.Error(w, `{"error":"scan failed"}`, http.StatusInternalServerError)
+			return
+		}
+		galeria = append(galeria, g)
+	}
+	galRows.Close()
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(agentInfoResponse{
 		Negocio:     neg,
@@ -142,5 +168,6 @@ func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
 		Promociones: promociones,
 		FAQs:        faqs,
 		Links:       links,
+		Galeria:     galeria,
 	})
 }
