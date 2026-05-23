@@ -255,6 +255,37 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			                     '{nombre} completó su cita #{numero} y tiene un descuento pendiente 🎉'
 		)`,
 
+		// ── promociones ──────────────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS promociones (
+			id           SERIAL PRIMARY KEY,
+			negocio_id   INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			titulo       VARCHAR(200) NOT NULL,
+			descripcion  TEXT,
+			imagen_url   TEXT,
+			activo       BOOLEAN NOT NULL DEFAULT true,
+			created_at   TIMESTAMP DEFAULT NOW()
+		)`,
+
+		// ── faqs ─────────────────────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS faqs (
+			id         SERIAL PRIMARY KEY,
+			negocio_id INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			pregunta   TEXT NOT NULL,
+			respuesta  TEXT NOT NULL,
+			activo     BOOLEAN NOT NULL DEFAULT true,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
+
+		// ── links ────────────────────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS links (
+			id         SERIAL PRIMARY KEY,
+			negocio_id INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			etiqueta   VARCHAR(100) NOT NULL,
+			url        TEXT NOT NULL,
+			activo     BOOLEAN NOT NULL DEFAULT true,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
+
 		// ── recompensas_clientes ──────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS recompensas_clientes (
 			id                   SERIAL PRIMARY KEY,

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -52,6 +53,7 @@ func (h *promocionesCRUDHandler) list(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(),
 		`SELECT `+promocionColumns+` FROM promociones WHERE negocio_id = $1 ORDER BY created_at DESC`, nid)
 	if err != nil {
+		log.Printf("promociones list query error: %v", err)
 		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
 		return
 	}
@@ -61,10 +63,16 @@ func (h *promocionesCRUDHandler) list(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		p, err := scanPromocion(rows)
 		if err != nil {
+			log.Printf("promociones list scan error: %v", err)
 			http.Error(w, `{"error":"scan failed"}`, http.StatusInternalServerError)
 			return
 		}
 		list = append(list, p)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("promociones list rows error: %v", err)
+		http.Error(w, `{"error":"rows error"}`, http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
