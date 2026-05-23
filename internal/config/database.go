@@ -43,6 +43,7 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		)`,
 		// columnas nuevas en tabla existente
 		`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS plan VARCHAR(20) NOT NULL DEFAULT 'basico'`,
+		`ALTER TABLE usuarios ALTER COLUMN plan SET DEFAULT 'prueba'`,
 
 		// ── negocios ──────────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS negocios (

@@ -113,7 +113,7 @@ func (h *usersHandler) register(w http.ResponseWriter, r *http.Request) {
 	// Idempotent: if uid already exists, return success
 	_, err := h.db.Exec(r.Context(),
 		`INSERT INTO usuarios (uid, email, role, plan)
-		 VALUES ($1, $2, 'client', 'basico')
+		 VALUES ($1, $2, 'client', 'prueba')
 		 ON CONFLICT (uid) DO NOTHING`,
 		uid, req.Email)
 	if err != nil {
@@ -328,9 +328,9 @@ func (h *usersHandler) updatePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch req.Plan {
-	case "basico", "pro":
+	case "prueba", "basico", "pro":
 	default:
-		http.Error(w, `{"error":"plan must be 'basico' or 'pro'"}`, http.StatusBadRequest)
+		http.Error(w, `{"error":"plan must be 'prueba', 'basico' or 'pro'"}`, http.StatusBadRequest)
 		return
 	}
 

@@ -25,6 +25,8 @@ func RegisterImagenes(r chi.Router, db *pgxpool.Pool, authMiddleware func(http.H
 		r.Use(authMiddleware)
 		r.Post("/servicio/{id}", h.uploadServicio)
 		r.Delete("/servicio/{id}", h.deleteServicio)
+		r.Post("/promocion/{id}", h.uploadPromocion)
+		r.Delete("/promocion/{id}", h.deletePromocion)
 	})
 }
 
@@ -146,6 +148,121 @@ func (h *imagenesHandler) deleteServicio(w http.ResponseWriter, r *http.Request)
 	if _, err := h.db.Exec(r.Context(),
 		`UPDATE servicios SET imagen_url=NULL WHERE id=$1 AND negocio_id=$2`,
 		sid, nid); err != nil {
+		http.Error(w, `{"error":"failed to clear image url"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"success": true})
+}
+
+// ── POST /api/imagenes/promocion/:id ─────────────────────────────
+
+func (h *imagenesHandler) uploadPromocion(w http.ResponseWriter, r *http.Request) {
+	uid := mw.UIDFromContext(r.Context())
+	nid, ok := negocioIDForUID(r.Context(), h.db, uid, w)
+	if !ok {
+		return
+	}
+
+	pid, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var exists bool
+	h.db.QueryRow(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM promociones WHERE id=$1 AND negocio_id=$2)`,
+		pid, nid).Scan(&exists)
+	if !exists {
+		http.Error(w, `{"error":"promocion not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, `{"error":"invalid multipart form"}`, http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("imagen")
+	if err != nil {
+		http.Error(w, `{"error":"campo 'imagen' requerido"}`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	cld, err := newUploaderAPI()
+	if err != nil {
+		http.Error(w, `{"error":"cloudinary init failed"}`, http.StatusInternalServerError)
+		return
+	}
+
+	publicID := fmt.Sprintf("dezai/negocio_%d/promociones/promo_%d", nid, pid)
+	folder := fmt.Sprintf("dezai/negocio_%d/promociones", nid)
+
+	resp, err := cld.Upload(context.Background(), file, uploader.UploadParams{
+		PublicID:       publicID,
+		Folder:         folder,
+		Overwrite:      cldapi.Bool(true),
+		UniqueFilename: cldapi.Bool(false),
+		Transformation: "w_800,c_limit,q_auto",
+	})
+	if err != nil {
+		http.Error(w, `{"error":"upload failed"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		`UPDATE promociones SET imagen_url=$1 WHERE id=$2 AND negocio_id=$3`,
+		resp.SecureURL, pid, nid); err != nil {
+		http.Error(w, `{"error":"failed to save image url"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"imagen_url": resp.SecureURL})
+}
+
+// ── DELETE /api/imagenes/promocion/:id ───────────────────────────
+
+func (h *imagenesHandler) deletePromocion(w http.ResponseWriter, r *http.Request) {
+	uid := mw.UIDFromContext(r.Context())
+	nid, ok := negocioIDForUID(r.Context(), h.db, uid, w)
+	if !ok {
+		return
+	}
+
+	pid, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var imagenURL *string
+	if err := h.db.QueryRow(r.Context(),
+		`SELECT imagen_url FROM promociones WHERE id=$1 AND negocio_id=$2`,
+		pid, nid).Scan(&imagenURL); err != nil {
+		http.Error(w, `{"error":"promocion not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if imagenURL == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"success": true})
+		return
+	}
+
+	cld, err := newUploaderAPI()
+	if err != nil {
+		http.Error(w, `{"error":"cloudinary init failed"}`, http.StatusInternalServerError)
+		return
+	}
+	publicID := fmt.Sprintf("dezai/negocio_%d/promociones/promo_%d", nid, pid)
+	cld.Destroy(context.Background(), uploader.DestroyParams{PublicID: publicID})
+
+	if _, err := h.db.Exec(r.Context(),
+		`UPDATE promociones SET imagen_url=NULL WHERE id=$1 AND negocio_id=$2`,
+		pid, nid); err != nil {
 		http.Error(w, `{"error":"failed to clear image url"}`, http.StatusInternalServerError)
 		return
 	}
