@@ -258,14 +258,29 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`ALTER TABLE promociones ADD COLUMN IF NOT EXISTS fecha_inicio DATE`,
 		`ALTER TABLE promociones ADD COLUMN IF NOT EXISTS fecha_fin   DATE`,
 
-		// ── galeria ──────────────────────────────────────────────────
-		`CREATE TABLE IF NOT EXISTS galeria (
-			id           SERIAL PRIMARY KEY,
-			negocio_id   INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
-			imagen_url   TEXT NOT NULL,
-			descripcion  TEXT,
-			created_at   TIMESTAMP DEFAULT NOW()
+		// ── agente_imagenes (renamed from galeria) ────────────────────
+		`DO $$ BEGIN
+		  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='galeria')
+		     AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='agente_imagenes') THEN
+		    ALTER TABLE galeria RENAME TO agente_imagenes;
+		  END IF;
+		END $$`,
+		`CREATE TABLE IF NOT EXISTS agente_imagenes (
+			id                    SERIAL PRIMARY KEY,
+			negocio_id            INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			url                   TEXT NOT NULL,
+			descripcion           TEXT,
+			descripcion_intencion TEXT,
+			activo                BOOLEAN DEFAULT true,
+			created_at            TIMESTAMP DEFAULT NOW()
 		)`,
+		`DO $$ BEGIN
+		  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='agente_imagenes' AND column_name='imagen_url') THEN
+		    ALTER TABLE agente_imagenes RENAME COLUMN imagen_url TO url;
+		  END IF;
+		END $$`,
+		`ALTER TABLE agente_imagenes ADD COLUMN IF NOT EXISTS descripcion_intencion TEXT`,
+		`ALTER TABLE agente_imagenes ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT true`,
 
 		// ── promociones ──────────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS promociones (
@@ -309,6 +324,19 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at           TIMESTAMP DEFAULT NOW(),
 			updated_at           TIMESTAMP DEFAULT NOW(),
 			UNIQUE(negocio_id, cliente_id)
+		)`,
+
+		// ── agente_configuracion ──────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS agente_configuracion (
+			id                        SERIAL PRIMARY KEY,
+			negocio_id                INTEGER UNIQUE NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			nombre_agente             VARCHAR(100) DEFAULT 'Asistente virtual',
+			tono                      VARCHAR(20) DEFAULT 'amigable',
+			mensaje_bienvenida        TEXT,
+			mensaje_fuera_horario     TEXT,
+			instrucciones_adicionales TEXT,
+			created_at                TIMESTAMP DEFAULT NOW(),
+			updated_at                TIMESTAMP DEFAULT NOW()
 		)`,
 	}
 

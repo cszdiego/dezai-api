@@ -29,19 +29,29 @@ type negocioPublico struct {
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
-type agentGaleriaItem struct {
-	ID          int     `json:"id"`
-	ImagenURL   string  `json:"imagen_url"`
-	Descripcion *string `json:"descripcion,omitempty"`
+type agentImagen struct {
+	ID                   int     `json:"id"`
+	URL                  string  `json:"url"`
+	Descripcion          *string `json:"descripcion,omitempty"`
+	DescripcionIntencion *string `json:"descripcion_intencion,omitempty"`
+}
+
+type agentConfiguracion struct {
+	NombreAgente             string `json:"nombre_agente"`
+	Tono                     string `json:"tono"`
+	MensajeBienvenida        string `json:"mensaje_bienvenida"`
+	MensajeFueraHorario      string `json:"mensaje_fuera_horario"`
+	InstruccionesAdicionales string `json:"instrucciones_adicionales"`
 }
 
 type agentInfoResponse struct {
-	Negocio     negocioPublico   `json:"negocio"`
-	Servicios   []servicio       `json:"servicios"`
-	Promociones []promocion      `json:"promociones"`
-	FAQs        []faq            `json:"faqs"`
-	Links       []link           `json:"links"`
-	Galeria     []agentGaleriaItem `json:"galeria"`
+	Negocio              negocioPublico     `json:"negocio"`
+	Servicios            []servicio         `json:"servicios"`
+	Promociones          []promocion        `json:"promociones"`
+	FAQs                 []faq              `json:"faqs"`
+	Links                []link             `json:"links"`
+	AgenteImagenes       []agentImagen      `json:"agente_imagenes"`
+	AgenteConfiguracion  agentConfiguracion `json:"agente_configuracion"`
 }
 
 func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +95,7 @@ func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
 	}
 	servRows.Close()
 
-	// Promociones activas
+	// Promociones activas y vigentes
 	promociones := []promocion{}
 	promRows, err := h.db.Query(r.Context(),
 		`SELECT `+promocionColumns+` FROM promociones
@@ -145,32 +155,49 @@ func (h *agentHandler) info(w http.ResponseWriter, r *http.Request) {
 	}
 	linkRows.Close()
 
-	// Galería
-	galeria := []agentGaleriaItem{}
-	galRows, err := h.db.Query(r.Context(),
-		`SELECT id, imagen_url, descripcion FROM galeria WHERE negocio_id = $1 ORDER BY created_at DESC`, nid)
+	// Imágenes del agente (solo activas)
+	imagenes := []agentImagen{}
+	imgRows, err := h.db.Query(r.Context(),
+		`SELECT id, url, descripcion, descripcion_intencion
+		 FROM agente_imagenes WHERE negocio_id = $1 AND activo = true ORDER BY created_at DESC`, nid)
 	if err != nil {
 		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
 		return
 	}
-	for galRows.Next() {
-		var g agentGaleriaItem
-		if err := galRows.Scan(&g.ID, &g.ImagenURL, &g.Descripcion); err != nil {
-			galRows.Close()
+	for imgRows.Next() {
+		var img agentImagen
+		if err := imgRows.Scan(&img.ID, &img.URL, &img.Descripcion, &img.DescripcionIntencion); err != nil {
+			imgRows.Close()
 			http.Error(w, `{"error":"scan failed"}`, http.StatusInternalServerError)
 			return
 		}
-		galeria = append(galeria, g)
+		imagenes = append(imagenes, img)
 	}
-	galRows.Close()
+	imgRows.Close()
+
+	// Configuración del agente (defaults si no existe)
+	var cfg agentConfiguracion
+	if err := h.db.QueryRow(r.Context(),
+		`SELECT nombre_agente, tono,
+		        COALESCE(mensaje_bienvenida,''),
+		        COALESCE(mensaje_fuera_horario,''),
+		        COALESCE(instrucciones_adicionales,'')
+		 FROM agente_configuracion WHERE negocio_id = $1`, nid,
+	).Scan(&cfg.NombreAgente, &cfg.Tono, &cfg.MensajeBienvenida, &cfg.MensajeFueraHorario, &cfg.InstruccionesAdicionales); err != nil {
+		cfg = agentConfiguracion{
+			NombreAgente: "Asistente virtual",
+			Tono:         "amigable",
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(agentInfoResponse{
-		Negocio:     neg,
-		Servicios:   servicios,
-		Promociones: promociones,
-		FAQs:        faqs,
-		Links:       links,
-		Galeria:     galeria,
+		Negocio:             neg,
+		Servicios:           servicios,
+		Promociones:         promociones,
+		FAQs:                faqs,
+		Links:               links,
+		AgenteImagenes:      imagenes,
+		AgenteConfiguracion: cfg,
 	})
 }
