@@ -338,6 +338,16 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at                TIMESTAMP DEFAULT NOW(),
 			updated_at                TIMESTAMP DEFAULT NOW()
 		)`,
+
+		// ── push_subscriptions (Web Push VAPID) ───────────────────────
+		`CREATE TABLE IF NOT EXISTS push_subscriptions (
+			id         SERIAL PRIMARY KEY,
+			negocio_id INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+			endpoint   TEXT NOT NULL UNIQUE,
+			p256dh     TEXT NOT NULL,
+			auth       TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
 	}
 
 	for _, s := range stmts {

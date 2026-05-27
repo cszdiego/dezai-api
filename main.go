@@ -52,6 +52,7 @@ func main() {
 	routes.RegisterCitas(r, db, authMiddleware)
 	routes.RegisterBloqueos(r, db, authMiddleware)
 	routes.RegisterVentas(r, db, authMiddleware)
+	routes.RegisterPush(r, db, authMiddleware)
 	routes.RegisterNotificaciones(r, db, authMiddleware)
 	routes.RegisterEstadisticas(r, db, authMiddleware)
 	routes.RegisterConfiguracionNotificaciones(r, db, authMiddleware)
