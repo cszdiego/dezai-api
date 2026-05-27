@@ -97,6 +97,10 @@ func (h *pushHandler) send(w http.ResponseWriter, r *http.Request) {
 
 	go webPushToNegocio(h.db, nid, req.Titulo, req.Mensaje)
 
+	h.db.Exec(r.Context(),
+		`INSERT INTO notificaciones (negocio_id, titulo, mensaje, tipo) VALUES ($1, $2, $3, 'sistema')`,
+		nid, req.Titulo, req.Mensaje)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
