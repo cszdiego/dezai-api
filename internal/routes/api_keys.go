@@ -110,10 +110,10 @@ func (h *apiKeysHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	var row apiKeyRow
 	err := h.db.QueryRow(r.Context(),
-		`INSERT INTO api_keys (negocio_id, nombre, key_hash, key_preview)
-		 VALUES ($1, $2, $3, $4)
+		`INSERT INTO api_keys (negocio_id, nombre, key_hash, key_preview, key_plain)
+		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, negocio_id, nombre, key_preview, activo, created_at, last_used_at`,
-		nid, strings.TrimSpace(req.Nombre), keyHash, keyPreview,
+		nid, strings.TrimSpace(req.Nombre), keyHash, keyPreview, key,
 	).Scan(&row.ID, &row.NegocioID, &row.Nombre, &row.KeyPreview,
 		&row.Activo, &row.CreatedAt, &row.LastUsedAt)
 	if err != nil {

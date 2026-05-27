@@ -349,6 +349,8 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at TIMESTAMP DEFAULT NOW()
 		)`,
 
+		`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_plain VARCHAR(255)`,
+
 		// ── faq_sugerencias ───────────────────────────────────────────
 		`CREATE TABLE IF NOT EXISTS faq_sugerencias (
 			id         SERIAL PRIMARY KEY,
