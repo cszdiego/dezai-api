@@ -348,6 +348,14 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			auth       TEXT NOT NULL,
 			created_at TIMESTAMP DEFAULT NOW()
 		)`,
+
+		// ── faq_sugerencias ───────────────────────────────────────────
+		`CREATE TABLE IF NOT EXISTS faq_sugerencias (
+			id         SERIAL PRIMARY KEY,
+			negocio_id INTEGER REFERENCES negocios(id) ON DELETE CASCADE,
+			pregunta   TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
 	}
 
 	for _, s := range stmts {
