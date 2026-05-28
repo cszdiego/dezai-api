@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -162,6 +163,11 @@ func webPushToNegocio(db *pgxpool.Pool, negocioID int, titulo, mensaje string) {
 			continue
 		}
 		log.Printf("Status respuesta: %d", resp.StatusCode)
+		if resp.StatusCode != 201 {
+			body, _ := io.ReadAll(resp.Body)
+			log.Printf("Error push status %d, body: %s, endpoint: %s",
+				resp.StatusCode, string(body), s.endpoint)
+		}
 		if resp.StatusCode == http.StatusGone {
 			// Subscription expirada — limpiar
 			db.Exec(ctx, `DELETE FROM push_subscriptions WHERE endpoint = $1`, s.endpoint)
