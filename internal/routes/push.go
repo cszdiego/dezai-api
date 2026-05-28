@@ -3,8 +3,6 @@ package routes
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"log"
 	"net/http"
 	"os"
 
@@ -145,7 +143,6 @@ func webPushToNegocio(db *pgxpool.Pool, negocioID int, titulo, mensaje string) {
 	vapidEmail   := os.Getenv("VAPID_EMAIL")
 
 	for _, s := range subs {
-		log.Printf("Enviando push a endpoint: %s", s.endpoint)
 		resp, err := webpush.SendNotification(payload, &webpush.Subscription{
 			Endpoint: s.endpoint,
 			Keys: webpush.Keys{
@@ -159,14 +156,7 @@ func webPushToNegocio(db *pgxpool.Pool, negocioID int, titulo, mensaje string) {
 			TTL:             30,
 		})
 		if err != nil {
-			log.Printf("Error enviando push: %v", err)
 			continue
-		}
-		log.Printf("Status respuesta: %d", resp.StatusCode)
-		if resp.StatusCode != 201 {
-			body, _ := io.ReadAll(resp.Body)
-			log.Printf("Error push status %d, body: %s, endpoint: %s",
-				resp.StatusCode, string(body), s.endpoint)
 		}
 		if resp.StatusCode == http.StatusGone {
 			// Subscription expirada — limpiar
